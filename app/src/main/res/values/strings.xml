@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">QRManagerApp</string>
+    <string name="menu_create">Создать QR-код</string>
+    <string name="menu_delete_all">Удалить все</string>
+</resources>
