@@ -2,6 +2,7 @@ package com.example.qrmanagerapp;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -18,8 +19,13 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class QRCodeDetailsActivity extends AppCompatActivity {
+
+    private Bitmap qrCodeBitmap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,20 +37,10 @@ public class QRCodeDetailsActivity extends AppCompatActivity {
 
         String qrCodeData = getIntent().getStringExtra("qr_code_data");
         if (qrCodeData != null) {
-            Bitmap qrCodeBitmap = generateQRCode(qrCodeData);
+            qrCodeBitmap = generateQRCode(qrCodeData);
             qrCodeImageView.setImageBitmap(qrCodeBitmap);
 
-            shareButton.setOnClickListener(v -> {
-                Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                shareIntent.setType("image/png");
-
-                ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                qrCodeBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
-                byte[] byteArray = stream.toByteArray();
-
-                shareIntent.putExtra(Intent.EXTRA_STREAM, byteArray);
-                startActivity(Intent.createChooser(shareIntent, "Поделиться QR-кодом через:"));
-            });
+            shareButton.setOnClickListener(v -> shareQRCode(qrCodeData));
         }
     }
 
@@ -66,6 +62,42 @@ public class QRCodeDetailsActivity extends AppCompatActivity {
         } catch (WriterException e) {
             e.printStackTrace();
             return null;
+        }
+    }
+
+    private void shareQRCode(String qrCodeData) {
+        if (qrCodeBitmap == null) {
+            return;
+        }
+
+        try {
+            // Сохраняем QR-код во временный файл
+            File cachePath = new File(getCacheDir(), "images");
+            cachePath.mkdirs();
+            File file = new File(cachePath, "qr_code.png");
+            FileOutputStream stream = new FileOutputStream(file);
+            qrCodeBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
+            stream.close();
+
+            // Получаем URI с помощью FileProvider
+            Uri fileUri = androidx.core.content.FileProvider.getUriForFile(
+                    this,
+                    getApplicationContext().getPackageName() + ".fileprovider",
+                    file
+            );
+
+            // Создаем Intent для отправки
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("image/png");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+            shareIntent.putExtra(Intent.EXTRA_TEXT, "QR-код: " + qrCodeData);
+
+            // Предоставляем временные разрешения получателю на доступ к URI
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            startActivity(Intent.createChooser(shareIntent, "Поделиться QR-кодом через"));
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
